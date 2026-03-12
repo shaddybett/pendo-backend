@@ -8,6 +8,7 @@ auth_bp = Blueprint('auth', __name__, url_prefix='/api/v1/auth')
 def verify():
     try:
         id_token = request.headers.get('Authorization')
+        print('Received Authorization header:', id_token)
         if not id_token:
             return jsonify({'error': 'Missing Authorization header'}), 400
         user = verify_firebase_token(id_token)

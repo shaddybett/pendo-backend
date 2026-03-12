@@ -30,4 +30,5 @@ def verify_firebase_token(id_token):
             'is_new_user': is_new_user
         }
     except Exception as e:
+        print('Firebase token verification error:', e)
         raise Exception('Invalid Firebase token')

@@ -4,6 +4,7 @@ from app.utils.firebase import *
 from app.routes.auth_routes import auth_bp
 from flask_migrate import Migrate
 from app.models import User, UserPhoto, Swipe, Match, Message, Block
+from app.utils import firebase
 
 migrate = Migrate()
 
