@@ -3,6 +3,7 @@ from app.services.auth_service import verify_firebase_token
 
 auth_bp = Blueprint('auth', __name__, url_prefix='/api/v1/auth')
 
+
 @auth_bp.route('/verify', methods=['POST'])
 def verify():
     try:

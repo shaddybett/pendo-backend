@@ -16,6 +16,8 @@ class User(db.Model):
     phone = db.Column(db.String(20), nullable=True)
     bio = db.Column(db.String(500), nullable=True)
     date_of_birth = db.Column(db.Date, nullable=True)
+    # if profile_completed == False → show onboarding 
+    profile_completed = db.Column(db.Boolean, nullable=False, default=False)
     # male, female, non-binary
     gender = db.Column(db.String(20), nullable=True)
     # male, female, everyone

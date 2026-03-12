@@ -3,6 +3,7 @@ from firebase_admin import auth as firebase_auth
 from app.models.user import User
 from app.extensions.db import db
 
+
 def verify_firebase_token(id_token):
     # Remove 'Bearer ' prefix if present
     if id_token.startswith('Bearer '):
@@ -16,7 +17,8 @@ def verify_firebase_token(id_token):
         user = User.query.filter_by(firebase_uid=firebase_uid).first()
         is_new_user = False
         if not user:
-            user = User(firebase_uid=firebase_uid, display_name=name, email=email)
+            user = User(firebase_uid=firebase_uid,
+                        display_name=name, email=email)
             db.session.add(user)
             db.session.commit()
             is_new_user = True
