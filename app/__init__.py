@@ -4,6 +4,7 @@ from flask_migrate import Migrate
 
 migrate = Migrate()
 
+
 def create_app():
     app = Flask(__name__)
 
