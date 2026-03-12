@@ -51,6 +51,13 @@ def get_metadata():
     return target_db.metadata
 
 
+def include_object(object, name, type_, reflected, compare_to):
+    """Exclude PostGIS system tables from autogenerate."""
+    if type_ == "table" and name == "spatial_ref_sys":
+        return False
+    return True
+
+
 def run_migrations_offline():
     """Run migrations in 'offline' mode.
 
@@ -65,7 +72,8 @@ def run_migrations_offline():
     """
     url = config.get_main_option("sqlalchemy.url")
     context.configure(
-        url=url, target_metadata=get_metadata(), literal_binds=True
+        url=url, target_metadata=get_metadata(), literal_binds=True,
+        include_object=include_object,
     )
 
     with context.begin_transaction():
@@ -100,6 +108,7 @@ def run_migrations_online():
         context.configure(
             connection=connection,
             target_metadata=get_metadata(),
+            include_object=include_object,
             **conf_args
         )
 

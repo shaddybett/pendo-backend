@@ -12,4 +12,7 @@ def create_app():
     db.init_app(app)
     migrate.init_app(app, db)
 
+    # Import all models so Alembic can detect them
+    from app.models import User, UserPhoto, Swipe, Match, Message, Block  # noqa: F401
+
     return app
