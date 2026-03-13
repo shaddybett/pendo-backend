@@ -1,9 +1,12 @@
+import logging
 import uuid
 from datetime import datetime, timedelta, timezone
 from functools import wraps
 
 import jwt
 from flask import current_app, g, jsonify, request
+
+log = logging.getLogger(__name__)
 
 
 def encode_access_token(user_id: uuid.UUID) -> str:
@@ -42,14 +45,19 @@ def token_required(f):
     def decorated(*args, **kwargs):
         auth_header = request.headers.get('Authorization', '')
         if not auth_header.startswith('Bearer '):
+            log.warning('token_required: missing or malformed Authorization header')
             return jsonify({'error': 'Missing or invalid Authorization header'}), 401
 
         token = auth_header.split(' ', 1)[1]
+        log.debug('token_required: token starts with %s...', token[:20])
         try:
             payload = decode_token(token)
+            log.debug('token_required: decoded payload sub=%s type=%s', payload.get('sub'), payload.get('type'))
         except jwt.ExpiredSignatureError:
+            log.warning('token_required: access token expired')
             return jsonify({'error': 'Token has expired'}), 401
-        except jwt.InvalidTokenError:
+        except jwt.InvalidTokenError as e:
+            log.warning('token_required: invalid token — %s', e)
             return jsonify({'error': 'Invalid token'}), 401
 
         if payload.get('type') != 'access':
