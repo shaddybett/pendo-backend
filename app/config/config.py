@@ -14,7 +14,6 @@ class Config:
         'pool_recycle': 300,
     }
 
-
 class DevelopmentConfig(Config):
     DEBUG = True
 
