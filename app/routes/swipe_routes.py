@@ -1,8 +1,10 @@
+import uuid
+
 from flask import Blueprint, g, jsonify, request
 
 from app.extensions.jwt import token_required
 from app.models.user import User
-from app.services.swipe_service import record_swipe
+from app.services.swipe_service import record_swipe, VALID_DIRECTIONS
 
 swipes_bp = Blueprint('swipes', __name__, url_prefix='/api/v1/swipes')
 
@@ -19,6 +21,16 @@ def create_swipe():
 
     if not target_user_id or not direction:
         return jsonify({'error': 'target_user_id and direction are required'}), 400
+
+    # Validate UUID format
+    try:
+        uuid.UUID(target_user_id)
+    except (ValueError, AttributeError):
+        return jsonify({'error': 'target_user_id must be a valid UUID'}), 400
+
+    # Validate direction early
+    if direction not in VALID_DIRECTIONS:
+        return jsonify({'error': f'direction must be one of: {", ".join(sorted(VALID_DIRECTIONS))}'}), 400
 
     # Verify target user exists
     target = User.query.get(target_user_id)
