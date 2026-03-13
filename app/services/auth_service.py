@@ -1,3 +1,4 @@
+import logging
 from datetime import datetime, timezone
 
 from firebase_admin import auth as firebase_auth
@@ -7,6 +8,8 @@ from app.extensions.db import db
 from app.extensions.jwt import encode_access_token, encode_refresh_token, decode_token
 from app.models.user import User
 
+log = logging.getLogger(__name__)
+
 
 def verify_firebase_and_issue_tokens(id_token: str) -> dict:
     """Verify a Firebase ID token, create or find the user, and return a JWT pair.
@@ -14,7 +17,10 @@ def verify_firebase_and_issue_tokens(id_token: str) -> dict:
     Returns the exact shape the frontend expects:
         { access_token, refresh_token, user_id, is_new_user }
     """
+    log.debug('Verifying Firebase token (first 20 chars): %s...', id_token[:20])
     decoded = firebase_auth.verify_id_token(id_token)
+    log.debug('Firebase decoded claims: uid=%s, email=%s, phone=%s',
+              decoded.get('uid'), decoded.get('email'), decoded.get('phone_number'))
 
     firebase_uid = decoded['uid']
     email = decoded.get('email')
@@ -23,6 +29,7 @@ def verify_firebase_and_issue_tokens(id_token: str) -> dict:
 
     user = User.query.filter_by(firebase_uid=firebase_uid).first()
     is_new_user = user is None
+    log.debug('User lookup: firebase_uid=%s, found=%s', firebase_uid, not is_new_user)
 
     if is_new_user:
         user = User(
