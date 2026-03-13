@@ -48,12 +48,30 @@ def discover_profiles(current_user: User, page: int, per_page: int) -> dict:
     query = query.order_by(ranking_expr.desc(), User.id)
 
     # ── Stage 5: Pagination ───────────────────────────────────────
-    total = query.count()
+    #   Build a count query from the filtered base (before ranking columns)
+    #   to avoid re-evaluating ranking expressions just for the count.
+    count_query = _apply_exclusions(
+        User.query.filter(User.is_active.is_(True)), current_user.id
+    )
+    count_query = _apply_preference_filters(count_query, current_user)
+    total = count_query.count()
     pages = math.ceil(total / per_page) if per_page > 0 else 0
 
     rows = query.offset((page - 1) * per_page).limit(per_page).all()
 
-    profiles = [_serialize_profile(user, score) for user, score in rows]
+    # Batch-load primary photos for all users in one query (avoid N+1)
+    user_ids = [user.id for user, _ in rows]
+    primary_photos = {}
+    if user_ids:
+        photos = (UserPhoto.query
+                  .filter(UserPhoto.user_id.in_(user_ids), UserPhoto.is_primary.is_(True))
+                  .all())
+        primary_photos = {p.user_id: p.url for p in photos}
+
+    profiles = [
+        _serialize_profile(user, score, primary_photos.get(user.id))
+        for user, score in rows
+    ]
 
     return {
         'profiles': profiles,
@@ -184,16 +202,8 @@ def _completeness_expression(current_user_id):
     return bio_score + photo_score + looking_for_score + dob_score
 
 
-def _serialize_profile(user: User, ranking_score: float) -> dict:
+def _serialize_profile(user: User, ranking_score: float, photo_url: str = None) -> dict:
     """Serialize a user to the DiscoveryProfile spec shape."""
-    # Get primary photo URL — single query per profile for now,
-    # will optimize with eager loading when needed
-    primary_photo = (UserPhoto.query
-                     .filter_by(user_id=user.id, is_primary=True)
-                     .first())
-    photo_url = primary_photo.url if primary_photo else None
-
-    # Compute age
     age = None
     if user.date_of_birth:
         today = datetime.now(timezone.utc).date()
