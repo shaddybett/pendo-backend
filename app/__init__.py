@@ -2,6 +2,7 @@ from flask import Flask
 from app.extensions.db import db
 from app.utils.firebase import *
 from app.routes.auth_routes import auth_bp
+from app.routes.user_routes import users_bp
 from flask_migrate import Migrate
 from app.models import User, UserPhoto, Swipe, Match, Message, Block
 from app.utils import firebase
@@ -18,5 +19,6 @@ def create_app():
     migrate.init_app(app, db)
 
     app.register_blueprint(auth_bp)
+    app.register_blueprint(users_bp)
 
     return app
