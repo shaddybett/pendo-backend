@@ -36,6 +36,7 @@ MarkupSafe==3.0.3
 msgpack==1.1.2
 proto-plus==1.27.1
 protobuf==6.33.5
+Pillow==12.1.1
 psycopg2-binary==2.9.10
 pyasn1==0.6.2
 pyasn1_modules==0.4.2
