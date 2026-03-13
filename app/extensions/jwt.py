@@ -10,6 +10,8 @@ log = logging.getLogger(__name__)
 
 
 def encode_access_token(user_id: uuid.UUID) -> str:
+    key = current_app.config['JWT_SECRET_KEY']
+    log.debug('encode_access_token: using key [%s...] (%d bytes)', key[:8], len(key))
     now = datetime.now(timezone.utc)
     payload = {
         'sub': str(user_id),
@@ -17,7 +19,7 @@ def encode_access_token(user_id: uuid.UUID) -> str:
         'iat': now,
         'exp': now + timedelta(seconds=current_app.config['JWT_ACCESS_TOKEN_EXPIRES']),
     }
-    return jwt.encode(payload, current_app.config['JWT_SECRET_KEY'], algorithm='HS256')
+    return jwt.encode(payload, key, algorithm='HS256')
 
 
 def encode_refresh_token(user_id: uuid.UUID) -> str:
@@ -33,7 +35,9 @@ def encode_refresh_token(user_id: uuid.UUID) -> str:
 
 def decode_token(token: str) -> dict:
     """Decode and validate a JWT. Raises jwt.ExpiredSignatureError or jwt.InvalidTokenError."""
-    return jwt.decode(token, current_app.config['JWT_SECRET_KEY'], algorithms=['HS256'])
+    key = current_app.config['JWT_SECRET_KEY']
+    log.debug('decode_token: using key [%s...] (%d bytes)', key[:8], len(key))
+    return jwt.decode(token, key, algorithms=['HS256'])
 
 
 def token_required(f):
