@@ -26,6 +26,8 @@ ALLOWED_IMAGE_TYPES = {
     'image/webp': 'webp',
 }
 MAX_PHOTO_SIZE = 10 * 1024 * 1024  # 10 MB
+PHOTO_MAX_WIDTH = 1080
+PHOTO_JPEG_QUALITY = 85
 
 
 def serialize_user(user: User) -> dict:
@@ -180,6 +182,9 @@ def update_location():
 @users_bp.route('/me/photos', methods=['POST'])
 @token_required
 def upload_photo():
+    from io import BytesIO
+    from PIL import Image
+
     user = User.query.get(g.current_user_id)
     if not user:
         return jsonify({'error': 'User not found'}), 404
@@ -200,18 +205,49 @@ def upload_photo():
     if len(file_data) > MAX_PHOTO_SIZE:
         return jsonify({'error': 'Photo must be 10 MB or smaller'}), 400
 
-    ext = ALLOWED_IMAGE_TYPES[content_type]
+    # Resize and compress — output always JPEG for consistency and small size
+    try:
+        img = Image.open(BytesIO(file_data))
+        img.exif_transpose(in_place=True) if hasattr(img, 'exif_transpose') else None
+        if img.mode in ('RGBA', 'P'):
+            img = img.convert('RGB')
+        if img.width > PHOTO_MAX_WIDTH:
+            ratio = PHOTO_MAX_WIDTH / img.width
+            img = img.resize((PHOTO_MAX_WIDTH, int(img.height * ratio)), Image.LANCZOS)
+        buf = BytesIO()
+        img.save(buf, format='JPEG', quality=PHOTO_JPEG_QUALITY, optimize=True)
+        file_data = buf.getvalue()
+        content_type = 'image/jpeg'
+    except Exception as e:
+        log.warning('Image processing failed, uploading original: %s', e)
+        # Fall through with original file_data if processing fails
+
     photo_id = uuid.uuid4()
+    ext = ALLOWED_IMAGE_TYPES[content_type]
     blob_path = f'users/{user.id}/photos/{photo_id}.{ext}'
 
+    # Upload to Firebase Storage with a persistent download token
     try:
+        from urllib.parse import quote
+
+        download_token = str(uuid.uuid4())
         bucket = get_storage_bucket()
         blob = bucket.blob(blob_path)
-        blob.upload_from_string(file_data, content_type=content_type)
+        blob.upload_from_string(
+            file_data,
+            content_type=content_type,
+        )
+        # Set metadata and cache after upload in a single patch — guaranteed to persist
+        blob.metadata = {'firebaseStorageDownloadTokens': download_token}
         blob.cache_control = 'public, max-age=31536000'
         blob.patch()
-        blob.make_public()
-        public_url = blob.public_url
+
+        # Permanent Firebase download URL — never expires
+        encoded_path = quote(blob_path, safe='')
+        download_url = (
+            f'https://firebasestorage.googleapis.com/v0/b/{bucket.name}'
+            f'/o/{encoded_path}?alt=media&token={download_token}'
+        )
     except Exception as e:
         log.exception('Photo upload to Firebase Storage failed: %s', e)
         return jsonify({'error': 'Photo upload failed'}), 500
@@ -221,10 +257,11 @@ def upload_photo():
     position = 0 if max_pos is None else max_pos + 1
     is_primary = position == 0
 
+    # Store the blob path so we can always re-sign or delete reliably
     photo = UserPhoto(
         id=photo_id,
         user_id=user.id,
-        url=public_url,
+        url=download_url,
         position=position,
         is_primary=is_primary,
     )
@@ -251,15 +288,19 @@ def delete_photo(photo_id):
     if not photo:
         return jsonify({'error': 'Photo not found'}), 404
 
-    # Delete from Firebase Storage
+    # Delete from Firebase Storage — try each possible extension
     try:
         bucket = get_storage_bucket()
-        # Extract blob path from the public URL
-        prefix = f'https://storage.googleapis.com/{bucket.name}/'
-        if photo.url.startswith(prefix):
-            blob_path = photo.url[len(prefix):]
+        deleted = False
+        for ext in ('jpg', 'png', 'webp'):
+            blob_path = f'users/{user.id}/photos/{photo.id}.{ext}'
             blob = bucket.blob(blob_path)
-            blob.delete()
+            if blob.exists():
+                blob.delete()
+                deleted = True
+                break
+        if not deleted:
+            log.warning('Photo blob not found in storage for photo_id=%s', photo.id)
     except Exception as e:
         log.warning('Failed to delete photo from storage (continuing): %s', e)
 

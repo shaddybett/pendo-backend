@@ -3,6 +3,8 @@ from app.extensions.db import db
 from app.utils.firebase import *
 from app.routes.auth_routes import auth_bp
 from app.routes.user_routes import users_bp
+from app.routes.swipe_routes import swipes_bp
+from app.routes.discovery_routes import discover_bp
 from flask_migrate import Migrate
 from app.models import User, UserPhoto, Swipe, Match, Message, Block
 from app.utils import firebase
@@ -20,5 +22,7 @@ def create_app():
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(users_bp)
+    app.register_blueprint(swipes_bp)
+    app.register_blueprint(discover_bp)
 
     return app
