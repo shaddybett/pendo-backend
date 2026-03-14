@@ -1,0 +1,10 @@
+.git
+__pycache__
+*.pyc
+*.pyo
+.env
+firebase_service_account.json
+.venv
+venv
+*.egg-info
+.pytest_cache

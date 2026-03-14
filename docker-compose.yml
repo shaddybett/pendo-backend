@@ -1,0 +1,79 @@
+services:
+  pendo-backend:
+    build: .
+    container_name: pendo-backend
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      - DATABASE_URL=postgresql://pendo:pendo_secret@pendo-db:5432/pendo
+      - FLASK_APP=run.py
+      - FLASK_ENV=development
+    volumes:
+      - ./firebase_service_account.json:/app/firebase_service_account.json:ro
+    depends_on:
+      pendo-db:
+        condition: service_healthy
+    networks:
+      - traefik-public
+      - pendo-internal
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=traefik-public"
+      # HTTP -> HTTPS redirect
+      - "traefik.http.routers.pendo-backend-http.entrypoints=http"
+      - "traefik.http.routers.pendo-backend-http.rule=Host(`pendo-dev.ruthwestlimited.com`)"
+      - "traefik.http.routers.pendo-backend-http.middlewares=https-redirect"
+      # HTTPS
+      - "traefik.http.routers.pendo-backend-https.entrypoints=https"
+      - "traefik.http.routers.pendo-backend-https.rule=Host(`pendo-dev.ruthwestlimited.com`)"
+      - "traefik.http.routers.pendo-backend-https.tls=true"
+      - "traefik.http.routers.pendo-backend-https.tls.certresolver=le"
+      - "traefik.http.routers.pendo-backend-https.service=pendo-backend-service"
+      # Service port
+      - "traefik.http.services.pendo-backend-service.loadbalancer.server.port=5000"
+
+  pendo-db:
+    image: postgres:16-alpine
+    container_name: pendo-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: pendo
+      POSTGRES_PASSWORD: pendo_secret
+      POSTGRES_DB: pendo
+    volumes:
+      - pendo-db-data:/var/lib/postgresql/data
+    networks:
+      - pendo-internal
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pendo -d pendo"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  pendo-seed:
+    build: .
+    container_name: pendo-seed
+    env_file: .env
+    environment:
+      - DATABASE_URL=postgresql://pendo:pendo_secret@pendo-db:5432/pendo
+      - FLASK_APP=run.py
+      - FLASK_ENV=development
+    volumes:
+      - ./firebase_service_account.json:/app/firebase_service_account.json:ro
+    depends_on:
+      pendo-db:
+        condition: service_healthy
+    networks:
+      - pendo-internal
+    command: >
+      sh -c "flask db upgrade && python seed_test_users.py"
+    restart: "no"
+
+volumes:
+  pendo-db-data:
+
+networks:
+  traefik-public:
+    external: true
+  pendo-internal:
+    driver: bridge

@@ -1,4 +1,5 @@
-from flask import Flask
+from flask import Flask, jsonify
+from sqlalchemy import text
 from app.extensions.db import db
 from app.utils.firebase import *
 from app.routes.auth_routes import auth_bp
@@ -24,5 +25,14 @@ def create_app():
     app.register_blueprint(users_bp)
     app.register_blueprint(swipes_bp)
     app.register_blueprint(discover_bp)
+
+    @app.route("/health")
+    def health():
+        try:
+            db.session.execute(text("SELECT 1"))
+            db_status = "up"
+        except Exception as e:
+            db_status = f"down: {e}"
+        return jsonify({"status": "ok", "database": db_status})
 
     return app
