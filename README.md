@@ -23,7 +23,7 @@ Dating/discovery platform API built with Flask, PostgreSQL, and Firebase.
 | `POST /api/v1/swipes` | Create a swipe (like/dislike/super_like) |
 | `GET /health` | Health check (API + database status) |
 
-## Local Development (Docker)
+## Docker Setup
 
 ### Prerequisites
 
@@ -43,46 +43,52 @@ cp .env.example .env
 | Variable | Description |
 |----------|-------------|
 | `SECRET_KEY` | Flask secret key |
-| `DATABASE_URL` | PostgreSQL connection string |
+| `DATABASE_URL` | PostgreSQL connection string (overridden by compose) |
 | `FIREBASE_STORAGE_BUCKET` | Firebase storage bucket name |
 | `FLASK_APP` | Entry point (`run.py`) |
 | `FLASK_ENV` | `development` or `production` |
 
-### Run
+### Dev Environment
+
+All dev containers are prefixed with `pendo-dev`. Routed via `pendo-dev.ruthwestlimited.com`.
 
 ```bash
-# Build and start all services (backend + postgres + seed)
-docker compose up -d --build
+# Start dev backend + database
+docker compose up -d --build pendo-dev pendo-dev-db
 
-# Check logs
-docker logs pendo-backend
-docker logs pendo-seed
+# Run migrations and seed the database
+docker compose run --rm pendo-dev-seed
 
-# Re-run migrations and seed
-docker compose run --rm pendo-seed
+# Rebuild backend only (DB already running)
+docker compose up -d --build pendo-dev
+
+# View logs
+docker logs pendo-dev
 ```
 
 ### Database Access
 
 ```bash
 # Interactive psql shell
-docker exec -it pendo-db psql -U pendo -d pendo
+docker exec -it pendo-dev-db psql -U pendo -d pendo_dev
 
 # One-off query
-docker exec pendo-db psql -U pendo -d pendo -c "SELECT count(*) FROM users;"
+docker exec pendo-dev-db psql -U pendo -d pendo_dev -c "SELECT count(*) FROM users;"
 ```
 
-### Services
+### Containers
 
 | Container | Description | Network |
 |-----------|-------------|---------|
-| `pendo-backend` | Flask API on port 5000 | traefik-public, pendo-internal |
-| `pendo-db` | PostgreSQL 16 | pendo-internal |
-| `pendo-seed` | Runs migrations + seeds DB | pendo-internal |
+| `pendo-dev` | Flask API on port 5000 | traefik-public, pendo-dev-internal |
+| `pendo-dev-db` | PostgreSQL 16 (database: `pendo_dev`) | pendo-dev-internal |
+| `pendo-dev-seed` | Runs migrations + seeds DB (one-shot) | pendo-dev-internal |
 
 ### Traefik Routing
 
-Dev environment is routed via `pendo-dev.ruthwestlimited.com` with automatic TLS.
+| Environment | Subdomain |
+|-------------|-----------|
+| Dev | `pendo-dev.ruthwestlimited.com` |
 
 ## Project Structure
 
